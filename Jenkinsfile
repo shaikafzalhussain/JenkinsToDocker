@@ -1,15 +1,15 @@
 pipeline {
-    // 1. Agent configuration
-    agent any
+    // Agent configuration
+    agent { label 'dev-server' }
     
-    // 2. Environment variables (Docker image specifics)
+    // Environment variables
     environment {
-        // Your Docker Hub username (from the image name)
+        // Your Docker Hub username
         DOCKER_HUB_USER = "shaikafzalhussain"
         // Your specific repository and image name
         DOCKER_IMAGE_NAME = "simple-webpage" 
         IMAGE_TAG = "latest"
-        // The ID of your Username with password credential
+        // The ID of your Username with password credential (DockerKey)
         DOCKER_CREDENTIAL_ID = 'DockerKey' 
     }
     
@@ -25,7 +25,7 @@ pipeline {
         
         stage("Clear Docker Session"){
             steps{
-                // ✅ FIX for 401 Unauthorized pull error: log out to clear stale credentials
+                // Fix for 401 Unauthorized pull error: log out to clear stale credentials
                 echo "Logging out of Docker to ensure anonymous pull for NGINX base image."
                 sh 'docker logout || true' 
             }
@@ -41,19 +41,20 @@ pipeline {
 
         stage("Push To DockerHub"){
             steps{
-                // 🔑 FIX: Using 'usernamePassword' to match how 'DockerKey' is configured
+                // Using 'usernamePassword' to load credentials for login
                 withCredentials([usernamePassword(
                     credentialsId: env.DOCKER_CREDENTIAL_ID,
                     usernameVariable: "dockerHubUser",  
                     passwordVariable: "dockerHubPass")]){
                         
-                    // 1. Login using the variables extracted from the credential
+                    // 1. Login
                     sh 'echo $dockerHubPass | docker login -u $dockerHubUser --password-stdin'
                     
-                    // 2. Tag the locally built image with the full remote path
-                    sh "docker image tag ${DOCKER_IMAGE_NAME}:${IMAGE_TAG} ${env.DOCKER_HUB_USER}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
+                    // 2. Tag (if needed, but using the full path is cleaner for push)
+                    // We can reuse the existing local tag structure for the remote tag
                     
                     // 3. Push the image
+                    echo "Pushing image to Docker Hub as ${env.DOCKER_HUB_USER}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
                     sh "docker push ${env.DOCKER_HUB_USER}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
                 }
             }
@@ -61,25 +62,27 @@ pipeline {
         
         stage("Deploy"){
             steps{
-                echo "Running Container"
+                echo "Deploying container, accessible on host port 8081."
                 // Stop/remove previous container before running the new one
                 sh 'docker stop simple-webpage || true'
                 sh 'docker rm simple-webpage || true'
-                sh "docker run -d --name simple-webpage -p 8080:80 ${env.DOCKER_HUB_USER}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
+
+                // 🚀 FIX for "address already in use" error: Mapped container port 80 to HOST port 8081
+                sh "docker run -d --name simple-webpage -p 8081:80 ${env.DOCKER_HUB_USER}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
             }
         }
     }
 
     post {
         always {
-            // Log out after push is done for security and to prevent future conflicts
+            // Log out after the pipeline is complete
             sh 'docker logout || true' 
         }
         success {
-            echo '✅ Pipeline execution successful!'
+            echo '✅ Pipeline execution successful! Access your app on port 8081.'
         }
         failure {
-            echo '❌ Pipeline execution failed!'
+            echo '❌ Pipeline execution failed! Check logs for errors.'
         }
     }
 }
