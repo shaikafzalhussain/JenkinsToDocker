@@ -1,6 +1,6 @@
 pipeline {
     // Agent configuration
-    agent { label 'dev-server' }
+    agent any
     
     // Environment variables
     environment {
