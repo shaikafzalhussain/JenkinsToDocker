@@ -5,7 +5,7 @@ pipeline {
         // Set the Docker image name and tag
         DOCKER_IMAGE_NAME = "shaikafzalhussain/simple-webpage"
         IMAGE_TAG = "latest"
-        // 🔑 UPDATED: Use the ID of your Jenkins secret text credential for the Docker password/token
+        // 🔑 CORRECTED: Using the specified Jenkins Secret Text credential ID
         DOCKER_CREDENTIAL_ID = 'DockerKey' 
     }
 
@@ -13,23 +13,24 @@ pipeline {
         
         stage('Declarative: Checkout SCM') {
             steps {
-                // The pipeline's initial checkout step
+                // ✅ FIX: Added a required step to prevent "No steps specified for branch" error.
+                // This stage usually just ensures the SCM is checked out.
+                echo 'Starting SCM checkout.'
             }
         }
 
         stage('Clone Repository') {
             steps {
-                // Ensure the working directory is set up correctly
+                // Explicitly clone the repository to the workspace
                 git url: 'https://github.com/shaikafzalhussain/JenkinsToDocker.git', branch: 'main'
             }
         }
         
         stage('Clear Docker Session') {
             steps {
-                // ✅ FIX for '401 Unauthorized' on pull: Log out to clear potentially bad/stale credentials.
-                // This ensures anonymous pull for public base images like NGINX succeeds.
+                // 🔑 FIX for previous '401 Unauthorized' pull error: Log out to clear stale credentials.
                 echo "Logging out of Docker to ensure anonymous pull for NGINX base image."
-                sh 'docker logout || true' // The '|| true' prevents pipeline failure if not logged in
+                sh 'docker logout || true' 
             }
         }
 
@@ -42,10 +43,10 @@ pipeline {
 
         stage('Push Image to DockerHub') {
             steps {
-                // Use withCredentials to securely inject the Docker Hub password/token from 'DockerKey' credential
+                // Use withCredentials to securely inject the Docker Hub PAT from 'DockerKey'
                 withCredentials([string(credentialsId: env.DOCKER_CREDENTIAL_ID, variable: 'dockerPassword')]) {
                     
-                    // Log in to Docker Hub using the credential
+                    // Log in to Docker Hub using the PAT
                     echo "Logging into Docker Hub as ${DOCKER_IMAGE_NAME.split('/')[0]}"
                     sh "echo \$dockerPassword | docker login -u ${DOCKER_IMAGE_NAME.split('/')[0]} --password-stdin"
                     
@@ -59,6 +60,7 @@ pipeline {
         stage('Run Container') {
             steps {
                 echo "Stopping and removing any old container..."
+                // The '|| true' ensures the pipeline doesn't fail if the container doesn't exist
                 sh 'docker stop simple-webpage || true'
                 sh 'docker rm simple-webpage || true'
 
