@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKERHUB_CREDENTIALS = credentials('DockerKey')
         IMAGE_NAME = ‘shaikafzalhussain/simple-webpage'
-    }
+     }
 
     stages {
         stage('Clone Repository') {
