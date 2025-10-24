@@ -16,8 +16,8 @@ pipeline {
         stage("Code Clone"){
             steps{
                 echo "Starting Code Clone."
-                // Clones your specific repository
-                git url: "https://github.com-shaikafzalhussain/JenkinsToDocker.git", branch: "main"
+                // ✅ FIX: The URL is now CORRECTED back to use a DOT (.)
+                git url: "https://github.com/shaikafzalhussain/JenkinsToDocker.git", branch: "main"
             }
         }
         
@@ -33,7 +33,7 @@ pipeline {
             steps{
                 echo "Building Docker image."
                 
-                // 🚀 FIX for "context deadline exceeded" error: Disable BuildKit
+                // FIX for "context deadline exceeded" error: Disable BuildKit
                 sh 'export DOCKER_BUILDKIT=0'
                 
                 // Build the image locally
@@ -52,7 +52,7 @@ pipeline {
                     // 1. Log in to Docker Hub
                     sh 'echo $dockerHubPass | docker login -u $dockerHubUser --password-stdin'
                     
-                    // 2. Tag (Ensures proper remote naming)
+                    // 2. Tag 
                     sh "docker image tag ${DOCKER_IMAGE_NAME}:${IMAGE_TAG} ${env.DOCKER_HUB_USER}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
                     
                     // 3. Push the image to Docker Hub
