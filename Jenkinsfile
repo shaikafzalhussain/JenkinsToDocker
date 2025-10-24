@@ -1,15 +1,13 @@
 pipeline {
-    // Agent configuration
-    agent any
+    // Agent configuration: Specifies where the pipeline runs
+    agent { label 'dev-server' }
     
-    // Environment variables
+    // Environment variables: Defines reusable values
     environment {
-        // Your Docker Hub username
         DOCKER_HUB_USER = "shaikafzalhussain"
-        // Your specific repository and image name
         DOCKER_IMAGE_NAME = "simple-webpage" 
         IMAGE_TAG = "latest"
-        // The ID of your Username with password credential (DockerKey)
+        // ID of your Username with password credential
         DOCKER_CREDENTIAL_ID = 'DockerKey' 
     }
     
@@ -17,44 +15,44 @@ pipeline {
         
         stage("Code Clone"){
             steps{
-                echo "Code Clone Stage"
-                // Your repository URL and branch
+                echo "Starting Code Clone."
+                // Clones your specific repository
                 git url: "https://github.com/shaikafzalhussain/JenkinsToDocker.git", branch: "main"
             }
         }
         
         stage("Clear Docker Session"){
             steps{
-                // Fix for 401 Unauthorized pull error: log out to clear stale credentials
-                echo "Logging out of Docker to ensure anonymous pull for NGINX base image."
+                // FIX for 401 Unauthorized pull error: Log out stale credentials
+                echo "Logging out of Docker to ensure anonymous pull for base images (e.g., NGINX)."
                 sh 'docker logout || true' 
             }
         }
 
         stage("Code Build & Test"){
             steps{
-                echo "Code Build Stage"
-                // Build the image with a temporary local tag
+                echo "Building Docker image."
+                // Builds the image locally
                 sh "docker build -t ${DOCKER_IMAGE_NAME}:${IMAGE_TAG} ."
             }
         }
 
         stage("Push To DockerHub"){
             steps{
-                // Using 'usernamePassword' to load credentials for login
+                // Loads 'DockerKey' as Username and Password variables
                 withCredentials([usernamePassword(
                     credentialsId: env.DOCKER_CREDENTIAL_ID,
                     usernameVariable: "dockerHubUser",  
                     passwordVariable: "dockerHubPass")]){
                         
-                    // 1. Login
+                    // 1. Log in to Docker Hub
                     sh 'echo $dockerHubPass | docker login -u $dockerHubUser --password-stdin'
                     
-                    // 2. Tag (if needed, but using the full path is cleaner for push)
-                    // We can reuse the existing local tag structure for the remote tag
+                    // 2. Tag (Optional, since the build already has a good local name, but ensures proper remote naming)
+                    sh "docker image tag ${DOCKER_IMAGE_NAME}:${IMAGE_TAG} ${env.DOCKER_HUB_USER}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
                     
-                    // 3. Push the image
-                    echo "Pushing image to Docker Hub as ${env.DOCKER_HUB_USER}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
+                    // 3. Push the image to Docker Hub
+                    echo "Pushing image to Docker Hub..."
                     sh "docker push ${env.DOCKER_HUB_USER}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
                 }
             }
@@ -63,11 +61,15 @@ pipeline {
         stage("Deploy"){
             steps{
                 echo "Deploying container, accessible on host port 8081."
-                // Stop/remove previous container before running the new one
+                
+                // 1. 🎯 FIX for changes not reflecting: Explicitly pull the latest image
+                sh "docker pull ${env.DOCKER_HUB_USER}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
+
+                // 2. Stop and remove the old container
                 sh 'docker stop simple-webpage || true'
                 sh 'docker rm simple-webpage || true'
 
-                // 🚀 FIX for "address already in use" error: Mapped container port 80 to HOST port 8081
+                // 3. Run the new container (Port 8081 is the fix for "address already in use")
                 sh "docker run -d --name simple-webpage -p 8081:80 ${env.DOCKER_HUB_USER}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
             }
         }
@@ -75,7 +77,7 @@ pipeline {
 
     post {
         always {
-            // Log out after the pipeline is complete
+            // Always ensure logout for security
             sh 'docker logout || true' 
         }
         success {
