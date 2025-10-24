@@ -1,6 +1,6 @@
 pipeline {
     // Agent configuration: Specifies where the pipeline runs
-    agent { label 'dev-server' }
+    agent any
     
     // Environment variables: Defines reusable values
     environment {
