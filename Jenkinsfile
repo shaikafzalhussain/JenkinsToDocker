@@ -17,14 +17,14 @@ pipeline {
             steps{
                 echo "Starting Code Clone."
                 // Clones your specific repository
-                git url: "https://github.com/shaikafzalhussain/JenkinsToDocker.git", branch: "main"
+                git url: "https://github.com-shaikafzalhussain/JenkinsToDocker.git", branch: "main"
             }
         }
         
         stage("Clear Docker Session"){
             steps{
-                // FIX for 401 Unauthorized pull error: Log out stale credentials
-                echo "Logging out of Docker to ensure anonymous pull for base images (e.g., NGINX)."
+                // FIX for 401 Unauthorized pull error
+                echo "Logging out of Docker to ensure anonymous pull for base images."
                 sh 'docker logout || true' 
             }
         }
@@ -32,7 +32,11 @@ pipeline {
         stage("Code Build & Test"){
             steps{
                 echo "Building Docker image."
-                // Builds the image locally
+                
+                // 🚀 FIX for "context deadline exceeded" error: Disable BuildKit
+                sh 'export DOCKER_BUILDKIT=0'
+                
+                // Build the image locally
                 sh "docker build -t ${DOCKER_IMAGE_NAME}:${IMAGE_TAG} ."
             }
         }
@@ -48,7 +52,7 @@ pipeline {
                     // 1. Log in to Docker Hub
                     sh 'echo $dockerHubPass | docker login -u $dockerHubUser --password-stdin'
                     
-                    // 2. Tag (Optional, since the build already has a good local name, but ensures proper remote naming)
+                    // 2. Tag (Ensures proper remote naming)
                     sh "docker image tag ${DOCKER_IMAGE_NAME}:${IMAGE_TAG} ${env.DOCKER_HUB_USER}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
                     
                     // 3. Push the image to Docker Hub
@@ -62,7 +66,7 @@ pipeline {
             steps{
                 echo "Deploying container, accessible on host port 8081."
                 
-                // 1. 🎯 FIX for changes not reflecting: Explicitly pull the latest image
+                // 1. FIX for changes not reflecting: Explicitly pull the latest image
                 sh "docker pull ${env.DOCKER_HUB_USER}/${DOCKER_IMAGE_NAME}:${IMAGE_TAG}"
 
                 // 2. Stop and remove the old container
